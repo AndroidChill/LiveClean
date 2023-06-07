@@ -4,14 +4,19 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.lifecycleScope
+import com.example.testappshtr.domain.ProductUi
 import com.example.testappshtr.ui.theme.TestAppShtrTheme
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -20,6 +25,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -62,23 +68,11 @@ import kotlinx.serialization.json.Json
 
 class MainActivity : ComponentActivity() {
 
+    private val viewModel by viewModels<MainViewModel>()
+
     @SuppressLint("CoroutineCreationDuringComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val client = HttpClient(OkHttp) {
-            install(ContentNegotiation) {
-                json(
-                    Json {
-                        prettyPrint = true
-                        isLenient = true
-                        ignoreUnknownKeys = true
-                        encodeDefaults = true
-                    }
-                )
-            }
-        }
-
         setContent {
             TestAppShtrTheme {
                 // A surface container using the 'background' color from the theme
@@ -86,15 +80,18 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    val results = runBlocking {
-                        client.get("https://food-delivery-api-bunbeauty.herokuapp.com/category") {
-                            parameter("companyUuid", "7416dba5-2825-4fe3-abfb-1494a5e2bf99")
-                        }.body<ListServer<CategoryServer>>().results
-                    }
 
-                    Column {
-                        results.forEach {
-                            Text(text = it.name)
+                    val data = viewModel.productState.collectAsState(initial = Result.Loading<List<ProductUi>>()).value
+
+                    val temp = data as Result<List<ProductUi>>
+                    when(temp) {
+                        is Result.Loading -> {}
+                        is Result.Error -> {}
+                        is Result.Empty -> {
+                            ContentName(name = "empty list error")
+                        }
+                        is Result.Success -> {
+                            Content(data = temp.data.map { "${it.name}: Цена-${it.price}" } )
                         }
                     }
                 }
@@ -140,6 +137,21 @@ class CategoryServer(
     @SerialName("priority")
     val priority: Int,
 )
+
+@Composable
+fun Content(data: List< String>) {
+    Column {
+        data.forEach { 
+            ContentName(name = (it))
+        }
+    }
+}
+
+
+@Composable
+fun ContentName(name:String) {
+    Text(text = name)
+}
 
 @Composable
 fun Greeting(name: String) {
